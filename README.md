@@ -1,55 +1,65 @@
-# Task 2 Submission: Extra-Seed 10-Fold Harmonic Ensemble
+# Task 2 Submission: 10-Fold Harmonic Ensemble, Wider TTA Band (0.45-0.62)
 
-Code by Sampa Misra, GleeLab.
+Code by Sampa Misra, Glee lab.
 
-Self-contained Docker inference package: prediction script, preprocessing helper, Python requirements, Dockerfile, reference preprocessing statistics, and a 10-fold ensemble checkpoint set.
+Self-contained Docker inference package: prediction script, preprocessing helper, Python requirements, Dockerfile, reference preprocessing statistics, and the same 10-fold ensemble checkpoint set shipped in `Task2_26.08.16_0.8727`.
 
-## What changed vs. the 0.8714 submission
+## What changed vs. the 0.8727 submission
 
-The fold ensemble grows from 5 to 10 members: the original 5 production folds (unchanged, identical weights since `Task2_26.08.10_0.8703`) plus 5 newly-trained folds using the exact same recipe and flags but a different random seed (777, vs the original 42) -- a different 5-fold cross-validation split and a different training trajectory. All 10 fold probabilities are combined with the same harmonic mean used since `Task2_26.08.14`. Everything else is identical:
+Exactly one constant, in `predict_task2.py`:
 
-- Same TTA band (`0.45 <= p <= 0.60`)
-- Same 4 zoom/brightness TTA views (zoom +/-5%, brightness +/-10%)
-- No CLAHE
-- Same threshold (0.50)
-- Same frozen Ark+ backbone, same tabular fusion head architecture, same training flags (`--no-balance-modality-label --class-weight balanced --label-smoothing 0.05 --no-fine-tune-last-stage`)
+```python
+TTA_LOW = 0.45
+TTA_HIGH = 0.60   # previous value in Task2_26.08.16_0.8727
+```
 
-## Why more folds
+changed to:
 
-Ensemble diversity through independently-seeded members is a standard variance-reduction technique -- it's mechanistically different from every other retraining attempt this cycle (multi-domain, metadata-dropout, compound-loss, longer-training-budget), none of which changed the recipe itself, only added more independent draws of the same one. It is purely additive: none of the original 5 fold checkpoints are replaced or modified.
+```python
+TTA_LOW = 0.45
+TTA_HIGH = 0.62
+```
+
+Nothing else differs -- same 10-fold checkpoint set (5 original seed=42 folds + 5 seed=777 folds), same harmonic-mean fold combination, same 4 zoom/brightness TTA views, same threshold (0.50), no retraining.
+
+## Why this change
+
+The narrow-band TTA re-examines any prediction whose base probability falls in `[TTA_LOW, TTA_HIGH]`. That band was originally tuned (`Task2_26.08.12`) against the 5-fold ensemble's probability distribution. Adding the seed=777 folds on `Task2_26.08.16` changed the ensemble's output distribution, so the old band width was never re-validated against the actual 10-fold ensemble until now.
 
 ## Local Validation (before submission)
 
-Verified via two independent local test harnesses (both reproducing the production TTA/harmonic-mean pipeline), compared against the exact original 5-fold ensemble on the same 6 datasets:
+Re-swept `TTA_HIGH` on the real, unmodified `predict_task2.py` (imported directly, not reimplemented) against the exact shipped 10-fold ensemble, across all 6 local datasets. `TTA_LOW=0.45` held fixed (known hard boundary from earlier band re-sweeps -- going below it reproduces a real Shenzhen regression).
 
-| Dataset | Original 5-fold | 10-fold (harness A) | 10-fold (harness B) |
-|---|---|---|---|
-| Internal | reference | tie | -0.0011 |
-| Montgomery | reference | tie | tie |
-| Shenzhen (clean) | reference | +0.0012 | +0.0027 |
-| Pakistan | reference | +0.0001 | tie |
-| TBX11K | reference | +0.0037 | +0.0025 |
-| TB Chest Radiography | reference | +0.0019 | +0.0034 |
+| Dataset | 0.45-0.60 (shipped, 0.8727) | 0.45-0.62 | 0.45-0.65 | 0.45-0.68 |
+|---|---|---|---|---|
+| Internal | 0.9901 | 0.9901 | 0.9901 | 0.9901 |
+| Montgomery | 0.9381 | 0.9381 | 0.9381 | 0.9381 |
+| Shenzhen (clean) | 0.9401 | 0.9401 | 0.9401 | 0.9401 |
+| Pakistan | 0.9073 | 0.9073 | 0.9073 | 0.9073 |
+| TBX11K | 0.8041 | **0.8045** | 0.8050 | 0.8050 |
+| TB Chest Radiography | 0.5915 | 0.5915 | 0.5915 | 0.5915 |
 
-Both harnesses agree on 5 of 6 datasets: Montgomery and Pakistan tie, and Shenzhen/TBX11K/TB Chest Radiography all show real, consistent gains. They disagree only on Internal -- one shows a tie, the other a small regression (-0.0011). This is the one open question mark on an otherwise consistent, positive local record; a fully clean, uninterrupted verification run using the actual unmodified `predict_task2.py` code (not a reimplementation) was started but not completed before this submission was built.
+Every dataset except TBX11K is completely flat across the entire grid -- zero change at any band width tested, including Internal (unlike `Task2_26.08.16`, which shipped with one small Internal-only regression). TBX11K climbs monotonically with band width and plateaus at 0.65 (0.68 adds nothing further). The 0.62 band keeps the change smaller while preserving a measurable TBX11K gain and no observed local regressions.
 
-## Caveat
+## Why 0.62
 
-Local proxy datasets, including Internal's own held-out split, have not reliably predicted the private leaderboard's direction all session -- this was true again as recently as `Task2_26.08.15`, which showed only a single small local regression (TB Chest Radiography, -0.0008) and still lost real score. Given that history, the unresolved Internal signal here is a real, acknowledged risk, not a guaranteed non-issue. This submission is a deliberate calculated bet given four other datasets show consistent, repeated real gains across two independent test harnesses.
+0.62 is the smallest tested widening that improves TBX11K without changing any other local dataset. This keeps the package close to the previously-shipped, organizer-verified recipe while avoiding the wider 0.65 band.
 
 ## Weights
 
 ```text
 weights/reference_quantiles_ch0.npy
 weights/class_weighted_metadata_fusion/arkplus_tabular_ch0_fold{1-5}_best.pth   (original, seed=42)
-weights/class_weighted_metadata_fusion/arkplus_tabular_ch0_fold{6-10}_best.pth  (new, seed=777, renamed from fold{1-5} to avoid collision)
+weights/class_weighted_metadata_fusion/arkplus_tabular_ch0_fold{6-10}_best.pth  (seed=777, renamed from fold{1-5} to avoid collision)
 ```
+
+Identical to `Task2_26.08.16_0.8727` -- weights are untouched, only the TTA band constant changed.
 
 ## Build And Run
 
 ```bash
-docker build -t gleelab-task2-10fold-seed777:latest .
-docker run --rm --gpus all -v /path/to/input:/input:ro -v "$PWD/output:/output" gleelab-task2-10fold-seed777:latest
+docker build -t gleelab-task2-band062:latest .
+docker run --rm --gpus all -v /path/to/input:/input:ro -v "$PWD/output:/output" gleelab-task2-band062:latest
 ```
 
 The container writes both `prediction.csv` and `test.csv`, each with:
@@ -58,8 +68,10 @@ The container writes both `prediction.csv` and `test.csv`, each with:
 filename,TB/Normal
 ```
 
+Smoke-tested locally against 2 sample images (`experiments/smoke_safe_tta_input/`), correct output format confirmed.
+
 The Docker image archive can be created with:
 
 ```bash
-docker save -o gleelab-task2-10fold-seed777.tar gleelab-task2-10fold-seed777:latest
+docker save -o gleelab-task2-band062.tar gleelab-task2-band062:latest
 ```

@@ -1,3 +1,5 @@
+# Author: Sampa Misra, Glee lab
+
 import argparse
 import csv
 import glob
@@ -34,7 +36,7 @@ ID2LABEL = {0: "Normal", 1: "TB"}
 # losses on 2/3 tested domains); brightness variation also has a direct
 # mechanistic link to cross-scanner exposure differences.
 TTA_LOW = 0.45
-TTA_HIGH = 0.60
+TTA_HIGH = 0.62
 TTA_ZOOM_BRIGHTNESS_VIEWS = [
     (1.05, 1.0),  # zoom in 5%
     (0.95, 1.0),  # zoom out 5%

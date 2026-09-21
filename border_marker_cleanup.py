@@ -1,3 +1,5 @@
+# Author: Sampa Misra, Glee lab
+
 """Heuristic removal of two acquisition artifacts found in modality_shortcut_gradcam_task2.py:
 black letterbox padding at the image edges, and small burned-in device markers in the corners.
 """

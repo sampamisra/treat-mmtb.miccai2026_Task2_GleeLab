@@ -1,5 +1,7 @@
 FROM pytorch/pytorch:2.3.1-cuda11.8-cudnn8-runtime
 
+LABEL org.opencontainers.image.authors="Sampa Misra, Glee lab"
+
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV PIP_NO_CACHE_DIR=1
