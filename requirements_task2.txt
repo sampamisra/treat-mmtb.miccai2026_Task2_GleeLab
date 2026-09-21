@@ -1,0 +1,6 @@
+# torch / torchvision are installed in the Dockerfile (CUDA 11.8 build).
+numpy>=1.24,<2.0
+pillow>=10.0.0
+tqdm>=4.65.0
+opencv-python-headless>=4.8.0
+timm==1.0.27
