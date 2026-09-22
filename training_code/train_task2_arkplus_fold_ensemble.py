@@ -1,23 +1,5 @@
 """
 Ark+ Swin-Base224 + tabular fusion (age, gender) for Task 2 TB/Normal classification.
-
-Copied from train_task2_arkplus_10foldcv.py (never edit that file in place
-for a new experiment). This variant is an exact repeat of the original
-0.8714 recipe -- same seed (42), same k-folds (5), same epochs/patience
-(20/5), same all flags -- to test GPU training reproducibility: does
-retraining the identical recipe reproduce the same result, or does
-non-determinism (already confirmed once this session via the SWA retrain)
-cause drift? Output goes to a brand-new directory
-(experiments/repeat_baseline_seed42/weights) so production weights at
-models/class_weighted_metadata_fusion/weights/ are never touched.
-
-R&D EXPERIMENT ONLY -- not used in the Docker submission. The organizers' fixed
-I/O contract only mounts /input/*.png (no metadata CSV), so a model that
-requires age/gender at inference time cannot run inside predict_task2.py. This
-script exists purely to check whether fusing non-modality clinical fields
-improves the internal prediction CSV, validated against external data the same
-way the last-stage fine-tuning experiment was.
-
 Modality_DICOM is deliberately EXCLUDED from the tabular branch: it is a
 near-deterministic shortcut in this dataset (XA/XC are ~100% TB, DX is ~99%
 Normal) and including it would reproduce the same shortcut-inflation failure
@@ -25,6 +7,8 @@ already observed when unfreezing more of the backbone.
 
 Backbone stays fully frozen throughout (this is what generalized best in prior
 experiments); only the tabular MLP + fusion classifier head are trained.
+
+By Sampa Misra
 """
 
 import argparse
