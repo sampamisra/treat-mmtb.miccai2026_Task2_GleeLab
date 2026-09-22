@@ -20,9 +20,7 @@ python train_task2_arkplus_fold_ensemble.py \
 ```
 
 Production copy of these 5 checkpoints lives at
-`models/class_weighted_metadata_fusion/weights/` in the project root (untouched since the
-very first 0.8714-era baseline).
-
+`models/class_weighted_metadata_fusion/weights/` in the project root 
 ## fold6-fold10 (extra diversity, seed=777, renamed fold1-5 -> fold6-10 to avoid collision)
 
 ```
