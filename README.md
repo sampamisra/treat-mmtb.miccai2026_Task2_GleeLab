@@ -1,77 +1,81 @@
-# Task 2 Submission: 10-Fold Harmonic Ensemble, Wider TTA Band (0.45-0.62)
+# TREAT-MMTB 2026 — Task 2: Class-Weighted Metadata-Aware Ark+ Fusion
 
-Code by Sampa Misra, Glee lab.
+Team GleeLab. TB / Normal classification from frontal chest radiographs and structured clinical metadata (age, sex). Private leaderboard F1 = **0.8727** (Rank 1, Task 2).
 
-Self-contained Docker inference package: prediction script, preprocessing helper, Python requirements, Dockerfile, reference preprocessing statistics, and the same 10-fold ensemble checkpoint set shipped in `Task2_26.08.16_0.8727`.
+This repository contains the full inference pipeline (Docker), the training code, and the trained model weights.
 
-## What changed vs. the 0.8727 submission
+## Dataset
 
-Exactly one constant, in `predict_task2.py`:
+- **Training set:** 7,757 frontal chest radiographs (TB / Normal), with age, sex, and imaging modality (CR, DX, XA, XC) available for each case.
+- **Internal validation set:** 1,940 radiographs, same format.
+- **Supplementary external evaluation** (never used for training): Montgomery, Shenzhen, Pakistan TB, and TBX11K — 8,408 images total. Age/sex metadata is available for Montgomery and Shenzhen; not available for Pakistan TB or TBX11K.
+- Imaging modality was excluded from the model input entirely: it was highly imbalanced by diagnostic label in the training data (some modalities were almost exclusively TB or almost exclusively Normal), which risked the model learning a modality-label shortcut instead of genuine radiographic findings. Only age and sex are used as auxiliary metadata.
 
-```python
-TTA_LOW = 0.45
-TTA_HIGH = 0.60   # previous value in Task2_26.08.16_0.8727
-```
+## Preprocessing
 
-changed to:
+Applied identically at training, validation, and inference time (`border_marker_cleanup.py` + preprocessing routines in `predict_task2.py`):
 
-```python
-TTA_LOW = 0.45
-TTA_HIGH = 0.62
-```
+1. Conservative border/corner artifact removal (black borders, corner/edge markers, opaque marks, label blocks — common in this dataset and not indicative of TB).
+2. Reference quantile intensity matching, harmonizing each image's intensity distribution against a fixed reference (`weights/reference_quantiles_ch0.npy`) to reduce cross-scanner/cross-site appearance differences.
+3. Per-image z-score normalization.
+4. Robust 0.5–99.5 percentile rescaling.
+5. Resize to 224×224, replicate to 3 channels, standard ImageNet normalization.
 
-Nothing else differs -- same 10-fold checkpoint set (5 original seed=42 folds + 5 seed=777 folds), same harmonic-mean fold combination, same 4 zoom/brightness TTA views, same threshold (0.50), no retraining.
+## Model Architecture
 
-## Why this change
+- **Image encoder:** Ark+ Swin-Base224, a chest-radiograph foundation model, used as a **frozen** backbone (no backbone weights are updated during training).
+- **Metadata branch:** age (z-normalized using training-set statistics, mean=49.05, std=15.55) and sex (binary-encoded), passed through a small 2→64 fully-connected layer with ReLU. Missing age/sex values fall back to neutral defaults (training-set mean age, 0.5 midpoint for sex) rather than excluding the case.
+- **Fusion:** the image feature vector and the metadata feature vector are concatenated and passed through a linear classification head (TB vs. Normal).
+- Only the metadata branch and the classification head are trained; the Ark+ backbone is frozen throughout.
 
-The narrow-band TTA re-examines any prediction whose base probability falls in `[TTA_LOW, TTA_HIGH]`. That band was originally tuned (`Task2_26.08.12`) against the 5-fold ensemble's probability distribution. Adding the seed=777 folds on `Task2_26.08.16` changed the ensemble's output distribution, so the old band width was never re-validated against the actual 10-fold ensemble until now.
+## Training Procedure & Parameters
 
-## Local Validation (before submission)
+- **Loss:** class-weighted cross-entropy with label smoothing (0.05), to address residual class imbalance without relying on modality-derived shortcuts.
+- **Cross-validation:** two independently-seeded 5-fold splits (seed=42 and seed=777) of identical architecture and training configuration, giving a 10-model ensemble in total. The second seed group is purely additive — it does not replace or modify the first.
+- **Key training flags:** `--no-balance-modality-label --class-weight balanced --label-smoothing 0.05 --no-fine-tune-last-stage`
+- Training script: `training_code/train_task2_arkplus_fold_ensemble.py`.
 
-Re-swept `TTA_HIGH` on the real, unmodified `predict_task2.py` (imported directly, not reimplemented) against the exact shipped 10-fold ensemble, across all 6 local datasets. `TTA_LOW=0.45` held fixed (known hard boundary from earlier band re-sweeps -- going below it reproduces a real Shenzhen regression).
+## Testing / Evaluation
 
-| Dataset | 0.45-0.60 (shipped, 0.8727) | 0.45-0.62 | 0.45-0.65 | 0.45-0.68 |
-|---|---|---|---|---|
-| Internal | 0.9901 | 0.9901 | 0.9901 | 0.9901 |
-| Montgomery | 0.9381 | 0.9381 | 0.9381 | 0.9381 |
-| Shenzhen (clean) | 0.9401 | 0.9401 | 0.9401 | 0.9401 |
-| Pakistan | 0.9073 | 0.9073 | 0.9073 | 0.9073 |
-| TBX11K | 0.8041 | **0.8045** | 0.8050 | 0.8050 |
-| TB Chest Radiography | 0.5915 | 0.5915 | 0.5915 | 0.5915 |
+Fold probabilities are combined via the **harmonic mean** (not a simple average) — a deliberately conservative combination rule that only yields a high TB probability when the fold ensemble agrees with reasonable confidence. A fixed decision threshold of 0.50 is used; thresholds tuned on internal validation data did not transfer reliably to the external cohorts, so no per-dataset threshold tuning is applied.
 
-Every dataset except TBX11K is completely flat across the entire grid -- zero change at any band width tested, including Internal (unlike `Task2_26.08.16`, which shipped with one small Internal-only regression). TBX11K climbs monotonically with band width and plateaus at 0.65 (0.68 adds nothing further). The 0.62 band keeps the change smaller while preserving a measurable TBX11K gain and no observed local regressions.
+| Dataset | F1 |
+|---|---|
+| Internal validation | 0.9901 |
+| Montgomery (external) | 0.9381 |
+| Shenzhen (external) | 0.9401 |
+| Pakistan TB (external) | 0.9073 |
+| TBX11K (external) | 0.8041 |
+| **Private leaderboard (real, organizer-evaluated)** | **0.8727** |
 
-## Why 0.62
+## Post-processing
 
-0.62 is the smallest tested widening that improves TBX11K without changing any other local dataset. This keeps the package close to the previously-shipped, organizer-verified recipe while avoiding the wider 0.65 band.
+A selective test-time augmentation step re-examines only borderline/uncertain predictions using a small set of additional zoom and brightness views of the same image, then averages the result with the original prediction. Predictions the model is already confident about are left unchanged. Horizontal flip is deliberately not used, since chest radiograph anatomy is not left-right symmetric.
 
 ## Weights
 
 ```text
 weights/reference_quantiles_ch0.npy
-weights/class_weighted_metadata_fusion/arkplus_tabular_ch0_fold{1-5}_best.pth   (original, seed=42)
-weights/class_weighted_metadata_fusion/arkplus_tabular_ch0_fold{6-10}_best.pth  (seed=777, renamed from fold{1-5} to avoid collision)
+weights/class_weighted_metadata_fusion/arkplus_tabular_ch0_fold{1-5}_best.pth   (seed=42)
+weights/class_weighted_metadata_fusion/arkplus_tabular_ch0_fold{6-10}_best.pth  (seed=777)
 ```
 
-Identical to `Task2_26.08.16_0.8727` -- weights are untouched, only the TTA band constant changed.
-
-## Build And Run
+## Build and Run
 
 ```bash
-docker build -t gleelab-task2-band062:latest .
-docker run --rm --gpus all -v /path/to/input:/input:ro -v "$PWD/output:/output" gleelab-task2-band062:latest
+docker build -t gleelab-task2:latest .
+docker run --rm --gpus all \
+  -v /path/to/input:/input:ro \
+  -v "$PWD/output:/output" \
+  gleelab-task2:latest
 ```
 
-The container writes both `prediction.csv` and `test.csv`, each with:
+The container reads PNG images (and an optional metadata CSV) from `/input` and writes `prediction.csv` (and `test.csv`) to `/output`, each with columns:
 
 ```text
 filename,TB/Normal
 ```
 
-Smoke-tested locally against 2 sample images (`experiments/smoke_safe_tta_input/`), correct output format confirmed.
+## Citation
 
-The Docker image archive can be created with:
-
-```bash
-docker save -o gleelab-task2-band062.tar gleelab-task2-band062:latest
-```
+Paper accepted to the TREAT-MMTB 2026 proceedings (Springer LNCS), presented at MICCAI 2026, Strasbourg, France.
