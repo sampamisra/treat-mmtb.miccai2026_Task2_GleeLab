@@ -1,6 +1,7 @@
 # TREAT-MMTB 2026 — Task 2: Class-Weighted Metadata-Aware Ark+ Fusion
 
-Team GleeLab. TB / Normal classification from frontal chest radiographs and structured clinical metadata (age, sex). Private leaderboard F1 = **0.8727** (Rank 1, Task 2).
+## Team GleeLab 
+TB / Normal classification from frontal chest radiographs and structured clinical metadata (age, sex). Private leaderboard F1 = **0.8727** (Rank 1, Task 2).
 
 This repository contains the full inference pipeline (Docker), the training code, and the trained model weights.
 
