@@ -45,7 +45,7 @@ A separate experiment that used `--k-folds 10` (replacing the 5-fold split with 
 split under the same seed=42, instead of adding a second independently-seeded 5-fold group)
 tested WORSE locally (regressed Internal AND Shenzhen) than this additive approach (which
 only ever regressed Internal, and even that was outweighed by real-world gains on every
-external proxy dataset). See `submission_history.md` for the full comparison table.
+external proxy dataset). 
 
 Both fold groups are combined at inference time via harmonic-mean fold ensembling
 (`1.0 / (1.0/fold_probs.clamp_min(1e-8)).mean(dim=0)`) exactly as `predict_task2.py` does for
