@@ -5,12 +5,7 @@ was produced by training the SAME recipe twice with two different random seeds, 
 combined (not a replacement of one split with another).
 
 `train_task2_arkplus_fold_ensemble.py` is the parameterized training script (seed and
-output directory are CLI flags). It was confirmed on 2026-08-17 to reproduce the original
-fold group's real-code-evaluated F1 to 4 decimals on all 6 local datasets when re-run with
-identical flags/seed, despite producing bit-different checkpoint weights (GPU
-non-determinism affects the trainable head's exact values but not its hard classification
-decisions here) -- see project memory `submission_history.md` / `local_proxy_unreliability.md`
-for the full writeup.
+output directory are CLI flags). 
 
 ## fold1-fold5 (original, seed=42)
 
